@@ -82,11 +82,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.input.Focused() {
 				m.input.Blur()
 				userMessage := m.input.Value()
-				m.content += wordwrap.String("> "+m.input.Value()+"\n", m.viewport.Width)
-				m.viewport.SetContent(m.content)
+				m.content += "\n" + wordwrap.String("> "+m.input.Value(), m.viewport.Width)
+				m.viewport.SetContent(m.content + "\n")
 				m.viewport.GotoBottom()
 				m.input.Reset()
 				m.input.Placeholder = ""
+				m.response = ""
 
 				return m, func() tea.Msg {
 					if err := m.client.Send(userMessage); err != nil {
@@ -99,17 +100,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case ai.ChatResponse:
 		m.response += string(msg)
-		response := wordwrap.String(m.response+"\n", m.viewport.Width)
-		response = lipgloss.NewStyle().Foreground(lipgloss.Color("#dd77ff")).Render(response)
-		m.viewport.SetContent(m.content + response)
+		response := wordwrap.String(m.response, m.viewport.Width)
+		response = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#dd77ff")).Render(response)
+		m.viewport.SetContent(m.content + response + "\n")
 		m.viewport.GotoBottom()
 		return m, func() tea.Msg { return m.client.Recv() }
 
 	case ai.ChatDone:
-		response := wordwrap.String(m.response+"\n", m.viewport.Width)
+		response := wordwrap.String(m.response, m.viewport.Width)
 		response = lipgloss.NewStyle().Foreground(lipgloss.Color("#999999")).Render(response)
-		m.content += response
-		m.viewport.SetContent(m.content)
+		m.content += "\n" + response
+		m.viewport.SetContent(m.content + "\n")
 		m.viewport.GotoBottom()
 		m.input.Focus()
 		return m, nil
