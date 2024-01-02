@@ -3,14 +3,22 @@ package ai
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 
 	"github.com/sashabaranov/go-openai"
 )
 
+type ChatResponse string
+
+type ChatDone struct{}
+
+type ChatErr error
+
 type Chat struct {
 	*openai.Client
-	req openai.ChatCompletionRequest
+	req   openai.ChatCompletionRequest
+	msgCh chan any
 }
 
 func NewChat() *Chat {
@@ -19,11 +27,13 @@ func NewChat() *Chat {
 		req: openai.ChatCompletionRequest{
 			Model:    openai.GPT3Dot5Turbo,
 			Messages: make([]openai.ChatCompletionMessage, 0),
+			Stream:   true,
 		},
+		msgCh: make(chan any),
 	}
 }
 
-func (c *Chat) Update(userMessage string) (openai.ChatCompletionMessage, error) {
+func (c *Chat) Send(userMessage string) error {
 	c.appendMessage(
 		openai.ChatCompletionMessage{
 			Role:    openai.ChatMessageRoleUser,
@@ -31,16 +41,43 @@ func (c *Chat) Update(userMessage string) (openai.ChatCompletionMessage, error) 
 		},
 	)
 
-	resp, err := c.CreateChatCompletion(context.Background(), c.req)
+	stream, err := c.CreateChatCompletionStream(context.Background(), c.req)
 	if err != nil {
-		return openai.ChatCompletionMessage{}, errors.New("failed to retrieve chat response")
+		return errors.New("failed to retrieve chat response")
 	}
-	if len(resp.Choices) == 0 {
-		return openai.ChatCompletionMessage{}, errors.New("empty chat response")
-	}
-	c.appendMessage(resp.Choices[0].Message)
 
-	return resp.Choices[0].Message, nil
+	go func() {
+		defer stream.Close()
+		msg := ""
+		for {
+			resp, err := stream.Recv()
+			if errors.Is(err, io.EOF) {
+				c.msgCh <- ChatDone{}
+				c.appendMessage(openai.ChatCompletionMessage{
+					Role:    openai.ChatMessageRoleAssistant,
+					Content: msg,
+				})
+				return
+			}
+			if err != nil {
+				c.msgCh <- ChatErr(err)
+				return
+			}
+			if len(resp.Choices) == 0 {
+				c.msgCh <- ChatErr(err)
+				return
+			}
+			c.msgCh <- ChatResponse(resp.Choices[0].Delta.Content)
+			msg += resp.Choices[0].Delta.Content
+		}
+	}()
+
+	return nil
+}
+
+func (c *Chat) Recv() any {
+	msg := <-c.msgCh
+	return msg
 }
 
 func (c *Chat) appendMessage(msg openai.ChatCompletionMessage) {

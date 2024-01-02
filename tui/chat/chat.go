@@ -1,8 +1,6 @@
 package chat
 
 import (
-	"fmt"
-
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
@@ -12,28 +10,15 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/hoani/hai/ai"
 	"github.com/muesli/reflow/wordwrap"
-	"github.com/sashabaranov/go-openai"
 )
-
-type source int
-
-const (
-	sourceUser source = iota
-	sourceAssistant
-)
-
-type message struct {
-	source  source
-	content string
-}
 
 type model struct {
 	ready    bool
 	input    textarea.Model
 	spinner  spinner.Model
 	viewport viewport.Model
+	response string
 	content  string
-	chat     []message
 	client   *ai.Chat
 }
 
@@ -52,7 +37,6 @@ func New() tea.Model {
 
 	return model{
 		input:   ti,
-		chat:    make([]message, 0),
 		client:  ai.NewChat(),
 		spinner: s,
 	}
@@ -81,6 +65,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.viewport.Width = msg.Width
 			m.viewport.Height = msg.Height - 5
+			m.viewport.GotoBottom()
 		}
 
 		if m.viewport.Height < 0 {
@@ -104,27 +89,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.Placeholder = ""
 
 				return m, func() tea.Msg {
-					result, err := m.client.Update(userMessage)
-					if err != nil {
+					if err := m.client.Send(userMessage); err != nil {
 						return err
 					}
-					return result
+					return m.client.Recv()
 				}
 			}
 		}
 
-	case openai.ChatCompletionMessage:
+	case ai.ChatResponse:
+		m.response += string(msg)
+		response := wordwrap.String(m.response+"\n", m.viewport.Width)
+		m.viewport.SetContent(m.content + response)
+		m.viewport.GotoBottom()
+		return m, func() tea.Msg { return m.client.Recv() }
 
-		if msg.Role == openai.ChatMessageRoleAssistant {
-			m.content += wordwrap.String(msg.Content+"\n", m.viewport.Width)
-		} else {
-			m.content += fmt.Sprintf("unexpected chat message from %s:", msg.Role)
-		}
-		m.input.Focus()
-
+	case ai.ChatDone:
+		m.content += wordwrap.String(m.response+"\n", m.viewport.Width)
 		m.viewport.SetContent(m.content)
 		m.viewport.GotoBottom()
-
+		m.input.Focus()
 		return m, nil
 
 	case error:
