@@ -100,12 +100,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ai.ChatResponse:
 		m.response += string(msg)
 		response := wordwrap.String(m.response+"\n", m.viewport.Width)
+		response = lipgloss.NewStyle().Foreground(lipgloss.Color("#dd77ff")).Render(response)
 		m.viewport.SetContent(m.content + response)
 		m.viewport.GotoBottom()
 		return m, func() tea.Msg { return m.client.Recv() }
 
 	case ai.ChatDone:
-		m.content += wordwrap.String(m.response+"\n", m.viewport.Width)
+		response := wordwrap.String(m.response+"\n", m.viewport.Width)
+		response = lipgloss.NewStyle().Foreground(lipgloss.Color("#999999")).Render(response)
+		m.content += response
 		m.viewport.SetContent(m.content)
 		m.viewport.GotoBottom()
 		m.input.Focus()
