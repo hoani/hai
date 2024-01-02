@@ -9,6 +9,11 @@ import (
 	"github.com/sashabaranov/go-openai"
 )
 
+type ChatStream interface {
+	Recv() (response openai.ChatCompletionStreamResponse, err error)
+	Close()
+}
+
 type ChatResponse string
 
 type ChatDone struct{}
@@ -46,33 +51,34 @@ func (c *Chat) Send(userMessage string) error {
 		return errors.New("failed to retrieve chat response")
 	}
 
-	go func() {
-		defer stream.Close()
-		msg := ""
-		for {
-			resp, err := stream.Recv()
-			if errors.Is(err, io.EOF) {
-				c.msgCh <- ChatDone{}
-				c.appendMessage(openai.ChatCompletionMessage{
-					Role:    openai.ChatMessageRoleAssistant,
-					Content: msg,
-				})
-				return
-			}
-			if err != nil {
-				c.msgCh <- ChatErr(err)
-				return
-			}
-			if len(resp.Choices) == 0 {
-				c.msgCh <- ChatErr(err)
-				return
-			}
-			c.msgCh <- ChatResponse(resp.Choices[0].Delta.Content)
-			msg += resp.Choices[0].Delta.Content
-		}
-	}()
+	go c.handleChatStream(stream)
 
 	return nil
+}
+
+func (c *Chat) handleChatStream(stream ChatStream) {
+	defer stream.Close()
+	msg := ""
+	for {
+		resp, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			c.msgCh <- ChatDone{}
+			c.appendMessage(openai.ChatCompletionMessage{
+				Role:    openai.ChatMessageRoleAssistant,
+				Content: msg,
+			})
+			return
+		}
+		if err != nil {
+			c.msgCh <- ChatErr(err)
+			return
+		}
+		if len(resp.Choices) == 0 {
+			continue
+		}
+		c.msgCh <- ChatResponse(resp.Choices[0].Delta.Content)
+		msg += resp.Choices[0].Delta.Content
+	}
 }
 
 func (c *Chat) Recv() any {
