@@ -1,6 +1,6 @@
 module github.com/hoani/hai
 
-go 1.21.4
+go 1.20
 
 require (
 	github.com/charmbracelet/bubbles v0.17.1
