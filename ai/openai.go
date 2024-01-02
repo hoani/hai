@@ -2,6 +2,7 @@ package ai
 
 import (
 	"context"
+	"errors"
 	"os"
 
 	"github.com/sashabaranov/go-openai"
@@ -22,7 +23,7 @@ func NewChat() *Chat {
 	}
 }
 
-func (c *Chat) Update(userMessage string) []openai.ChatCompletionMessage {
+func (c *Chat) Update(userMessage string) (openai.ChatCompletionMessage, error) {
 	c.appendMessage(
 		openai.ChatCompletionMessage{
 			Role:    openai.ChatMessageRoleUser,
@@ -32,12 +33,14 @@ func (c *Chat) Update(userMessage string) []openai.ChatCompletionMessage {
 
 	resp, err := c.CreateChatCompletion(context.Background(), c.req)
 	if err != nil {
-		// TODO: handle this better.
-		return c.req.Messages
+		return openai.ChatCompletionMessage{}, errors.New("failed to retrieve chat response")
+	}
+	if len(resp.Choices) == 0 {
+		return openai.ChatCompletionMessage{}, errors.New("empty chat response")
 	}
 	c.appendMessage(resp.Choices[0].Message)
 
-	return c.req.Messages
+	return resp.Choices[0].Message, nil
 }
 
 func (c *Chat) appendMessage(msg openai.ChatCompletionMessage) {
