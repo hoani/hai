@@ -1,4 +1,4 @@
-package chat
+package tuichat
 
 import (
 	"github.com/charmbracelet/bubbles/key"

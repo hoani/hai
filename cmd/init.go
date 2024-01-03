@@ -1,16 +1,18 @@
 package cmd
 
 import (
-	"fmt"
-
+	tea "github.com/charmbracelet/bubbletea"
+	tuiinit "github.com/hoani/hai/tui/init"
 	"github.com/spf13/cobra"
 )
 
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize the hai assistant.",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("TODO: init called")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		p := tea.NewProgram(tuiinit.New())
+		_, err := p.Run()
+		return err
 	},
 }
 
