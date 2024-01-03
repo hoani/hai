@@ -68,12 +68,12 @@ func Load() (*Config, error) {
 		return nil, errors.Wrap(err, "unable to open config file")
 	}
 
-	var c *Config
-	if err := json.Unmarshal(b, c); err != nil {
+	var c Config
+	if err := json.Unmarshal(b, &c); err != nil {
 		return nil, errors.Wrap(err, "config file is corrupted")
 	}
 
-	return c, nil
+	return &c, nil
 }
 
 func configPath() (string, error) {
