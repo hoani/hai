@@ -1,6 +1,8 @@
 package tuichat
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textarea"
@@ -11,6 +13,15 @@ import (
 	"github.com/hoani/hai/ai"
 	"github.com/hoani/hai/config"
 	"github.com/muesli/reflow/wordwrap"
+)
+
+const (
+	inputHeight       = 3
+	chatTopHeight     = 0
+	chatBottomHeight  = 1
+	inputTopHeight    = 1
+	inputBottomHeight = 1
+	nonChatHeight     = inputHeight + chatTopHeight + chatBottomHeight + inputTopHeight + inputBottomHeight
 )
 
 type model struct {
@@ -28,7 +39,7 @@ func New() (tea.Model, error) {
 	ti.ShowLineNumbers = false
 	ti.CharLimit = 0
 	ti.SetWidth(80)
-	ti.SetHeight(3)
+	ti.SetHeight(inputHeight)
 	ti.Placeholder = "How can I help today?"
 	ti.Focus()
 
@@ -62,7 +73,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.input.SetWidth(msg.Width)
 
 		if !m.ready {
-			m.viewport = viewport.New(msg.Width, msg.Height-5)
+			m.viewport = viewport.New(msg.Width, msg.Height-nonChatHeight)
 			m.viewport.YPosition = 0
 			m.viewport.HighPerformanceRendering = false // TODO: do we want this?
 			m.viewport.SetContent("")
@@ -70,7 +81,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ready = true
 		} else {
 			m.viewport.Width = msg.Width
-			m.viewport.Height = msg.Height - 5
+			m.viewport.Height = msg.Height - nonChatHeight
 			m.viewport.GotoBottom()
 		}
 
@@ -89,7 +100,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.input.Blur()
 				userMessage := m.input.Value()
 				m.content += "\n" + wordwrap.String("> "+m.input.Value(), m.viewport.Width)
-				m.viewport.SetContent(m.content + "\n")
+				m.viewport.SetContent(m.content)
 				m.viewport.GotoBottom()
 				m.input.Reset()
 				m.input.Placeholder = ""
@@ -107,16 +118,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case ai.ChatResponse:
 		m.response += string(msg)
 		response := wordwrap.String(m.response, m.viewport.Width)
-		response = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#dd77ff")).Render(response)
-		m.viewport.SetContent(m.content + response + "\n")
+		response = "\n" + lipgloss.NewStyle().Foreground(lipgloss.Color("#ff22ff")).Render(response)
+		m.viewport.SetContent(m.content + response)
 		m.viewport.GotoBottom()
 		return m, func() tea.Msg { return m.client.Recv() }
 
 	case ai.ChatDone:
 		response := wordwrap.String(m.response, m.viewport.Width)
-		response = lipgloss.NewStyle().Foreground(lipgloss.Color("#999999")).Render(response)
+		response = lipgloss.NewStyle().Foreground(lipgloss.Color("#dd77ff")).Render(response)
 		m.content += "\n" + response
-		m.viewport.SetContent(m.content + "\n")
+		m.viewport.SetContent(m.content)
 		m.viewport.GotoBottom()
 		m.input.Focus()
 		return m, nil
@@ -137,20 +148,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	s := ""
-	s += m.viewport.View()
-	s += "\n"
 
-	s += m.input.View()
+	s := m.viewport.View() + "\n"
 
-	s += "\n"
+	chatBorder := "[ Up/Dn (shift-↑/↓) | ½Pg Up/Dn (ctrl-u/d) | Pg Up/Dn (pgup/pgdn) ] "
 
-	if !m.input.Focused() {
-		s += m.spinner.View()
+	if borderLen := m.viewport.Width - len([]rune(chatBorder)) - 2; borderLen > 0 {
+		chatBorder = strings.Repeat(" ", borderLen) + chatBorder
 	}
 
-	// The footer
-	s += " Press ctrl-C to quit.\n"
+	chatBorder = lipgloss.NewStyle().Foreground(lipgloss.Color("#555")).Render(chatBorder)
+
+	if !m.input.Focused() {
+		chatBorder = m.spinner.View() + chatBorder
+	} else {
+		chatBorder = "  " + chatBorder
+	}
+
+	s += chatBorder + "\n"
+
+	s += strings.Repeat("=", m.viewport.Width) + "\n"
+
+	s += m.input.View() + "\n"
+
+	footer := "[ Send (enter) | Navigate (↑/↓/→/←) | Quit (ctrl-C) ]="
+	if borderLen := m.viewport.Width - len([]rune(footer)); borderLen > 0 {
+		footer = strings.Repeat("=", borderLen) + footer
+	}
+	s += footer + "\n"
 
 	// Send the UI for rendering
 	return s
@@ -160,11 +185,11 @@ func ViewportKeymap() viewport.KeyMap {
 	return viewport.KeyMap{
 		PageDown: key.NewBinding(
 			key.WithKeys("pgdown"),
-			key.WithHelp("f/pgdn", "page down"),
+			key.WithHelp("pgdn", "page down"),
 		),
 		PageUp: key.NewBinding(
 			key.WithKeys("pgup"),
-			key.WithHelp("b/pgup", "page up"),
+			key.WithHelp("pgup", "page up"),
 		),
 		HalfPageUp: key.NewBinding(
 			key.WithKeys("ctrl+u"),
