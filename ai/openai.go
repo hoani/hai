@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 
-	"github.com/hoani/hai/config"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -26,13 +25,9 @@ type Chat struct {
 	msgCh chan any
 }
 
-func NewChat() *Chat {
-	c, err := config.Load()
-	if err != nil {
-		panic(err) // TODO: don't panic.
-	}
+func NewChat(openaiKey string) *Chat {
 	return &Chat{
-		Client: openai.NewClient(c.AI.OpenAI.Key),
+		Client: openai.NewClient(openaiKey),
 		req: openai.ChatCompletionRequest{
 			Model:    openai.GPT3Dot5Turbo,
 			Messages: make([]openai.ChatCompletionMessage, 0),

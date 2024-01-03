@@ -9,6 +9,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/hoani/hai/ai"
+	"github.com/hoani/hai/config"
 	"github.com/muesli/reflow/wordwrap"
 )
 
@@ -22,7 +23,7 @@ type model struct {
 	client   *ai.Chat
 }
 
-func New() tea.Model {
+func New() (tea.Model, error) {
 	ti := textarea.New()
 	ti.ShowLineNumbers = false
 	ti.CharLimit = 0
@@ -35,11 +36,16 @@ func New() tea.Model {
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("200"))
 
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, err
+	}
+
 	return model{
 		input:   ti,
-		client:  ai.NewChat(),
+		client:  ai.NewChat(cfg.AI.OpenAI.Key),
 		spinner: s,
-	}
+	}, nil
 }
 
 func (m model) Init() tea.Cmd {

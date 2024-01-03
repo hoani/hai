@@ -6,6 +6,7 @@ package cmd
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	tuichat "github.com/hoani/hai/tui/chat"
+	tuiinit "github.com/hoani/hai/tui/init"
 	"github.com/spf13/cobra"
 )
 
@@ -20,8 +21,20 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		p := tea.NewProgram(tuichat.New())
-		_, err := p.Run()
+		chat, err := tuichat.New()
+		if err != nil { // Attempt to init.
+			p := tea.NewProgram(tuiinit.New())
+			if _, err := p.Run(); err != nil {
+				return err
+			}
+
+			chat, err = tuichat.New()
+			if err != nil {
+				return err
+			}
+		}
+		p := tea.NewProgram(chat)
+		_, err = p.Run()
 		return err
 	},
 }

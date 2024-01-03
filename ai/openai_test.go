@@ -11,7 +11,7 @@ import (
 )
 
 func TestHandleChatStream(t *testing.T) {
-	c := NewChat()
+	c := NewChat("key")
 
 	ts := newTestChatStream(
 		withChatStreamDelta("Hello W"),
@@ -42,7 +42,7 @@ func TestHandleChatStream(t *testing.T) {
 }
 
 func TestHandleChatStreamWithError(t *testing.T) {
-	c := NewChat()
+	c := NewChat("key")
 
 	ts := newTestChatStream(
 		withChatStreamDelta("Hello W"),
